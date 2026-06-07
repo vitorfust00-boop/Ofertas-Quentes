@@ -117,21 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }))
                 });
             }
-    // Auto-Login DEV (Bypass para testar o App sem o Google no Netlify Drop ou Localhost)
-    if (window.location.hostname.includes('netlify.app') || window.location.hostname === 'localhost' || window.location.hostname === '') {
-        console.log("Ambiente de teste detectado. Fazendo Auto-Login DEV.");
-        setTimeout(() => {
-            window.handleGoogleLogin({
-                credential: btoa(JSON.stringify({
-                    email: "dev_vitor@teste.com",
-                    name: "Admin (Teste)",
-                    sub: "dev_" + Date.now(),
-                    picture: "https://via.placeholder.com/40"
-                }))
-            });
-        }, 500);
+        });
     }
-    
     const btnGps = document.getElementById('btn-gps');
     const locationStatus = document.getElementById('location-status');
     const locationSection = document.getElementById('location-section');
