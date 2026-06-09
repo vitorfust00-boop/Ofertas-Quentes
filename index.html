@@ -25,9 +25,15 @@
 
             <!-- Login Section -->
             <section class="login-section" id="login-section">
-                <div class="glass-card text-center" style="max-width: 400px; margin: 0 auto 30px;">
+                <div class="glass-card text-center" style="max-width: 400px; margin: 0 auto 30px; position: relative;">
                     <h2>Bem-vindo!</h2>
                     <p style="margin-bottom: 20px;">Faça login com a sua conta do Google.</p>
+                    <div id="login-loading" class="hidden" style="margin-bottom: 15px; color: var(--primary);">
+                        <div class="spinner" style="width: 30px; height: 30px; border-width: 3px; margin: 0 auto 10px;"></div>
+                        <span id="login-status-text">Autenticando...</span>
+                    </div>
+                    <div id="login-error-msg" class="hidden" style="color: #e74c3c; background: rgba(231, 76, 60, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem;"></div>
+                    
                     <div id="g_id_onload"
                          data-client_id="80926685032-jke4jqu7ffe6b2lf6oflar1bdtfeagmd.apps.googleusercontent.com"
                          data-context="signin"
@@ -35,7 +41,13 @@
                          data-callback="handleGoogleLogin"
                          data-auto_prompt="false">
                     </div>
-                    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" style="display: flex; justify-content: center;"></div>
+                    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" style="display: flex; justify-content: center; margin-bottom: 15px;"></div>
+                    
+                    <!-- Botão de emergência para testes locais -->
+                    <div id="local-test-login" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px;">
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">Testando no computador? O Google bloqueia arquivos locais.</p>
+                        <button id="btn-mock-login" class="btn-secondary" style="font-size: 0.9rem; padding: 8px 15px; margin: 0 auto;">Entrar no Modo de Teste</button>
+                    </div>
                 </div>
             </section>
 
@@ -140,11 +152,60 @@
             </section>
         </div> <!-- End App View -->
         
-        <!-- Créditos -->
-        <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; margin-top: auto;">
-            Créditos de ajuda: Rafael Garcia Toledo e Sophia Chalegre Calegari
+        <!-- Créditos e Feedback -->
+        <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+            <div>Créditos de ajuda: Rafael Garcia Toledo e Sophia Chalegre Calegari</div>
+            <button id="btn-open-feedback" class="btn-secondary" style="font-size: 0.8rem; padding: 5px 15px; margin: 0; border-radius: 20px;">💬 Nos fale sua crítica</button>
         </footer>
         </main>
+    </div>
+    
+    <!-- Modal de Críticas e Sugestões -->
+    <div id="feedback-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-content">
+            <h2 style="margin-bottom: 20px; text-align: center;">Críticas e Sugestões</h2>
+            <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Sua opinião será enviada diretamente para o administrador.</p>
+            
+            <form action="https://formsubmit.co/vitorferreirafusti@gmail.com" method="POST" id="feedback-form">
+                <!-- Configurações ocultas do FormSubmit -->
+                <input type="hidden" name="_subject" value="Nova Crítica/Sugestão - Ofertas Quente">
+                <input type="hidden" name="_captcha" value="false">
+                <input type="hidden" name="_template" value="box">
+                <input type="hidden" id="feedback-user-name" name="Nome_Usuario" value="">
+                <input type="hidden" id="feedback-user-email" name="Email_Usuario" value="">
+                <input type="hidden" id="feedback-date" name="Data_Envio" value="">
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Sua Mensagem *</label>
+                    <textarea name="Mensagem" id="feedback-message" class="search-input" rows="5" placeholder="Escreva sua crítica, sugestão ou comentário aqui..." style="width: 100%; resize: vertical;" required></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" id="btn-cancel-feedback" class="btn-icon" style="width: auto; padding: 0 20px; border-radius: 10px;">Cancelar</button>
+                    <button type="submit" id="btn-submit-feedback" class="btn-primary" style="margin-top: 0; border-radius: 10px;">Enviar E-mail</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Painel Administrativo -->
+    <div id="admin-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-content" style="max-height: 90vh; overflow-y: auto; max-width: 600px; width: 95%;">
+            <h2 style="margin-bottom: 20px; text-align: center; color: #e74c3c;">🛡️ Painel Administrativo</h2>
+            
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <input type="text" id="admin-search-user" class="search-input" placeholder="Buscar usuário por e-mail ou nome..." style="flex: 1;">
+                <button id="btn-admin-search" class="btn-secondary" style="margin: 0;">Buscar</button>
+            </div>
+            
+            <div id="admin-users-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <!-- Resultados da busca de usuários -->
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: 20px;">Digite um nome ou e-mail para pesquisar.</div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end;">
+                <button id="btn-close-admin" class="btn-primary" style="margin-top: 0; border-radius: 10px;">Fechar Painel</button>
+            </div>
+        </div>
     </div>
     
     <!-- Modal de Avisar Preço -->
@@ -219,6 +280,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-    <script src="app_final.js?v=25"></script>
+    <script src="app.js?v=23"></script>
 </body>
 </html>
