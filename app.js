@@ -479,7 +479,7 @@ function loadAdminFeedbacks() {
             
             card.style.cssText = `background: ${bgClass}; border: ${borderClass}; padding: 15px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px;`;
             
-            const dateStr = data.timestamp ? data.timestamp.toDate().toLocaleString() : 'Recente';
+            const dateStr = data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate().toLocaleString() : new Date(data.timestamp).toLocaleString()) : 'Recente';
             
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -586,16 +586,17 @@ document.getElementById('btn-submit-feedback').addEventListener('click', async (
     btn.disabled = true;
 
     try {
-        // Dispara e esquece! Não usamos await para não travar a UI (evita demorar "1000 anos")
+        // Dispara e esquece! Não usamos await para não travar a UI
         db.collection("feedbacks").add({
             userId: currentUser ? currentUser.id : 'anon',
             name: currentUser ? currentUser.name : 'Visitante',
             email: currentUser ? currentUser.email : '',
             message: message,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            timestamp: new Date(), // Usando data local para evitar problemas de query
             read: false
         }).catch(err => {
             console.error("Erro background feedback:", err);
+            alert("AVISO: Houve um erro oculto ao salvar no banco. A crítica não foi enviada! " + err.message);
         });
 
         alert("Sua crítica foi enviada ao administrador!");
