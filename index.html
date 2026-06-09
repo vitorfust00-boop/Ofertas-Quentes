@@ -2,223 +2,142 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ofertas Quente</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ofertas Quente 2.0</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Local CSS -->
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Landing View -->
-        <div id="landing-view">
-            <!-- Header -->
-            <header class="header">
-                <h1 class="logo">🔥 Ofertas <span class="highlight">Quente</span></h1>
-                <p class="subtitle">As melhores promoções da sua região</p>
-            </header>
 
-            <!-- Login Section -->
-            <section class="login-section" id="login-section">
-                <div class="glass-card text-center" style="max-width: 400px; margin: 0 auto 30px;">
-                    <h2>Bem-vindo!</h2>
-                    <p style="margin-bottom: 20px;">Faça login com a sua conta do Google.</p>
-                    <div id="g_id_onload"
-                         data-client_id="80926685032-jke4jqu7ffe6b2lf6oflar1bdtfeagmd.apps.googleusercontent.com"
-                         data-context="signin"
-                         data-ux_mode="popup"
-                         data-callback="handleGoogleLogin"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" style="display: flex; justify-content: center;"></div>
-                </div>
-            </section>
+    <!-- OVERLAY DE LOGIN (Obriga o usuário a logar antes de ver o app) -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <h1 class="logo">🔥 Ofertas <span class="highlight">Quente</span></h1>
+            <p class="subtitle">As melhores promoções da região</p>
+            
+            <div id="login-warning" class="hidden error-box">
+                O Google não permite login em arquivos locais. Se você está testando no PC, suba para um servidor.
+            </div>
 
-        <!-- Main Content -->
-        <main class="main-content" id="main-content-area" style="display: none;">
-            <!-- Location Section -->
-            <section class="location-section" id="location-section">
-                <div class="glass-card text-center">
-                    <h2>Encontre as ofertas perto de você</h2>
-                    <p>Precisamos da sua localização para mostrar os mercados reais da sua região.</p>
-                    
-                    <button id="btn-gps" class="btn-primary" style="margin-bottom: 15px;">
-                        📍 Usar meu GPS
-                    </button>
-                    
-                    <div style="margin: 15px 0; color: var(--text-muted); font-size: 0.9rem;">OU</div>
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="input-address" class="search-input" placeholder="Digite sua rua, bairro e cidade..." style="flex: 1;">
-                        <button id="btn-address" class="btn-secondary" style="margin-top: 0;">Buscar</button>
-                    </div>
-
-                    <p id="location-status" class="status-msg"></p>
-                </div>
-            </section>
-
-            <!-- Loading AI Animation -->
-            <section class="ai-loading hidden" id="ai-loading">
+            <div id="g_id_onload"
+                 data-client_id="80926685032-jke4jqu7ffe6b2lf6oflar1bdtfeagmd.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLogin"
+                 data-auto_prompt="false">
+            </div>
+            
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" style="display: flex; justify-content: center; margin-top: 20px;"></div>
+            
+            <div id="login-loading" class="hidden" style="margin-top: 20px; text-align: center;">
                 <div class="spinner"></div>
-                <p>Analisando mercados próximos...</p>
-            </section>
-        </div> <!-- End Landing View -->
-
-        <!-- App View (Map & Results) -->
-        <div id="app-view" class="hidden">
-            <!-- User Profile Header -->
-            <div id="user-profile-header" class="glass-card" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 10px 20px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <img id="user-avatar" src="https://via.placeholder.com/40" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--primary);">
-                    <div>
-                        <strong id="user-name" style="font-size: 1rem;">Usuário</strong>
-                        <span id="user-role-badge" style="font-size: 0.65rem; background: rgba(255,255,255,0.1); padding: 3px 6px; border-radius: 5px; margin-left: 5px;">Consumidor</span>
-                    </div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Reputação</div>
-                    <strong style="color: var(--secondary); font-size: 1.2rem;">⭐ <span id="user-reputation-score">0</span></strong>
-                </div>
+                <p style="margin-top: 10px; color: var(--primary);">Autenticando...</p>
             </div>
+        </div>
+    </div>
 
-            <!-- Main Header for App View -->
-            <header class="header" style="padding: 0 0 20px 0;">
-                <h1 class="logo" style="font-size: 2rem;">🔥 Ofertas <span class="highlight">Quente</span></h1>
-            </header>
-
-            <!-- Results Section (Markets & Offers) -->
-            <section class="results-section" id="results-section">
-                <!-- Search & Camera Area -->
-                <div class="search-container">
-                    <input type="text" id="search-input" class="search-input" placeholder="Buscar por produto ou cód. barras...">
-                    <button id="btn-search" class="btn-icon" title="Pesquisar">🔍</button>
-                    <button id="btn-camera" class="btn-icon" title="Ler Código de Barras">📷</button>
-                    <button id="btn-open-report" class="btn-primary" style="margin-top: 0; border-radius: 10px; padding: 10px 15px;">➕ Avisar Preço</button>
-                    <button id="btn-open-market" class="btn-secondary" style="margin-top: 0; border-radius: 10px; padding: 10px 15px;">🏢 Cadastrar NOVO Mercado</button>
-                </div>
-
-                <!-- Camera Reader Container -->
-                <div id="reader-container" class="hidden">
-                    <div id="reader"></div>
-                </div>
-                <!-- Map Container -->
-                <div class="map-container" style="position: relative;">
-                    <div id="map"></div>
-                    <div id="map-loading-overlay" class="hidden" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(0,0,0,0.8); color: #fff; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px;">
-                        <div class="spinner" style="width: 15px; height: 15px; border-width: 2px;"></div>
-                        Buscando mercados na região...
-                    </div>
-                    <!-- Crosshair para Seleção Manual -->
-                    <div id="map-crosshair" class="hidden" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -100%); z-index: 1000; pointer-events: none;">
-                        <div style="font-size: 3rem; color: #ff3b30; text-shadow: 0 2px 5px rgba(0,0,0,0.5);">📍</div>
-                    </div>
-                    <div id="map-confirm-location" class="hidden" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; display: flex; gap: 10px; flex-direction: column;">
-                        <div style="background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 10px; text-align: center; font-size: 0.9rem;">
-                            Arraste o mapa para colocar o 📍 no local exato do mercado.
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button id="btn-cancel-crosshair" class="btn btn-secondary" style="flex: 1; margin: 0; padding: 10px;">Cancelar</button>
-                            <button id="btn-confirm-crosshair" class="btn btn-primary" style="flex: 2; margin: 0; padding: 10px;">Confirmar Local</button>
-                        </div>
-                    </div>
-                </div>
-
-                <h2 class="section-title">Mercados na Região</h2>
-                <div class="market-list" id="market-list">
-                    <!-- Markets will be injected here via JS -->
-                </div>
-
-                <h2 class="section-title mt-4">Promoções em Destaque</h2>
-                <div class="offers-grid" id="offers-grid">
-                    <!-- Offers will be injected here via JS -->
-                </div>
-            </section>
-        </div> <!-- End App View -->
+    <!-- MAIN APP CONTAINER -->
+    <div id="app-container" class="app-container hidden">
         
-        <!-- Créditos -->
-        <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; margin-top: auto;">
-            Créditos de ajuda: Rafael Garcia Toledo e Sophia Chalegre Calegari
-        </footer>
+        <!-- HEADER GLOBAL -->
+        <header class="app-header">
+            <h2>🔥 Ofertas <span class="highlight">Quente</span></h2>
+            <div class="header-profile">
+                <img id="header-avatar" src="https://via.placeholder.com/40" alt="Perfil" class="avatar-sm">
+            </div>
+        </header>
+
+        <!-- ÁREA DE CONTEÚDO (ABAS) -->
+        <main class="tab-content-area">
+            
+            <!-- ABA 1: MAPA / INÍCIO -->
+            <section id="tab-map" class="tab-pane active">
+                <div class="map-wrapper">
+                    <div id="map"></div>
+                    <div class="map-overlay-controls">
+                        <button id="btn-request-gps" class="btn-action">📍 Usar meu GPS</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 2: OFERTAS (#marketprice) -->
+            <section id="tab-offers" class="tab-pane">
+                <div class="container-padding">
+                    <h2 class="section-title">🏷️ Mural de Ofertas</h2>
+                    <div class="search-bar-wrapper">
+                        <input type="text" id="search-offers" class="input-text" placeholder="Buscar por leite, arroz...">
+                        <button class="btn-action-small">🔍</button>
+                    </div>
+                    
+                    <div id="offers-feed" class="feed-grid">
+                        <div class="empty-state">
+                            <p>Nenhuma oferta encontrada na região ainda.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: PERFIL -->
+            <section id="tab-profile" class="tab-pane">
+                <div class="container-padding profile-section">
+                    <img id="profile-avatar-large" src="https://via.placeholder.com/100" class="avatar-lg">
+                    <h2 id="profile-name">Nome do Usuário</h2>
+                    <p id="profile-email" class="text-muted">email@exemplo.com</p>
+                    
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <span class="stat-value" id="profile-reputation">50</span>
+                            <span class="stat-label">Reputação</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value" id="profile-role">Consumidor</span>
+                            <span class="stat-label">Permissão</span>
+                        </div>
+                    </div>
+
+                    <div id="admin-panel-btn-container" class="hidden">
+                        <button id="btn-open-admin" class="btn-danger" style="width: 100%; margin-top: 20px;">🛡️ Acessar Painel Admin</button>
+                    </div>
+
+                    <button id="btn-logout" class="btn-secondary" style="width: 100%; margin-top: 15px;">Sair</button>
+                </div>
+            </section>
+
         </main>
-    </div>
-    
-    <!-- Modal de Avisar Preço -->
-    <div id="report-modal" class="modal-overlay hidden">
-        <div class="glass-card modal-content">
-            <h2 style="margin-bottom: 20px; text-align: center;">Avisar Preço</h2>
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Produto</label>
-                <input type="text" id="report-product" class="search-input" placeholder="Ex: Arroz 5kg, Cerveja..." style="width: 100%;">
-            </div>
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Mercado</label>
-                <select id="report-market" class="search-input" style="width: 100%;">
-                    <option value="">Selecione um mercado próximo...</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 25px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Preço (R$)</label>
-                <input type="number" id="report-price" class="search-input" step="0.01" placeholder="Ex: 19.99" style="width: 100%;">
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button id="btn-cancel-report" class="btn-icon" style="width: auto; padding: 0 20px; border-radius: 10px;">Cancelar</button>
-                <button id="btn-submit-report" class="btn-primary" style="margin-top: 0; border-radius: 10px;">Enviar Preço</button>
-            </div>
-        </div>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="tab-map">
+                <span class="icon">🗺️</span>
+                <span class="label">Início</span>
+            </button>
+            <button class="nav-item" data-target="tab-offers">
+                <span class="icon">🏷️</span>
+                <span class="label">Ofertas</span>
+            </button>
+            <button class="nav-item" data-target="tab-profile">
+                <span class="icon">👤</span>
+                <span class="label">Perfil</span>
+            </button>
+        </nav>
     </div>
 
-    <!-- Modal de Cadastrar Mercado -->
-    <div id="market-modal" class="modal-overlay hidden">
-        <div class="glass-card modal-content" style="max-height: 90vh; overflow-y: auto;">
-            <h2 style="margin-bottom: 20px; text-align: center;">Cadastrar Meu Mercado</h2>
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Nome do Estabelecimento *</label>
-                <input type="text" id="new-market-name" class="search-input" placeholder="Ex: Mercado Feneri" style="width: 100%;">
-            </div>
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">CEP *</label>
-                <input type="text" id="new-market-cep" class="search-input" placeholder="Ex: 01001-000" style="width: 100%;" maxlength="9">
-                <small id="cep-status" style="color: var(--secondary); display: none;">Buscando endereço...</small>
-            </div>
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Rua *</label>
-                <input type="text" id="new-market-street" class="search-input" style="width: 100%;" placeholder="Nome da rua">
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <div style="flex: 2;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Bairro</label>
-                    <input type="text" id="new-market-neighborhood" class="search-input" style="width: 100%;" placeholder="Bairro">
-                </div>
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Número *</label>
-                    <input type="text" id="new-market-number" class="search-input" placeholder="Ex: 123" style="width: 100%;">
-                </div>
-            </div>
-            <div style="margin-bottom: 25px;">
-                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Cidade / UF</label>
-                <input type="text" id="new-market-city" class="search-input" style="width: 100%;" placeholder="Ex: São Paulo / SP">
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button id="btn-cancel-market" class="btn-icon" style="width: auto; padding: 0 20px; border-radius: 10px;">Cancelar</button>
-                <button id="btn-submit-market" class="btn-primary" style="margin-top: 0; border-radius: 10px;">Salvar Mercado</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Leaflet JS -->
+    <!-- Scripts Externos -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <!-- HTML5 QRCode -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
-    <script src="app_final.js?v=25"></script>
+    
+    <!-- App Logic -->
+    <script src="app.js"></script>
 </body>
 </html>
