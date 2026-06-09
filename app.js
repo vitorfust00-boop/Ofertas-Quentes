@@ -35,17 +35,24 @@ function parseJwt (token) {
 
 let currentUser = null;
 
-window.handleGoogleLogin = function(response) {
+window.handleGoogleLogin = async function(response) {
+    const errorMsgBox = document.getElementById('login-error-msg');
+    const loadingBox = document.getElementById('login-loading');
+    
     try {
+        console.log("[LOGIN] Login iniciado. Callback do Google recebido.");
+        errorMsgBox.classList.add('hidden');
+        loadingBox.classList.remove('hidden');
+
         const data = parseJwt(response.credential);
         if (!data) {
-            alert("Erro: Não foi possível ler os dados do Google.");
-            return;
+            throw new Error("Não foi possível ler os dados da conta Google.");
         }
 
         const email = data.email.toLowerCase().trim();
+        console.log("[LOGIN] Token recebido e decodificado. Email:", email);
+
         let role = 'consumer';
-        
         const genericDomains = ['@gmail.com', '@hotmail.com', '@yahoo.com', '@outlook.com', '@bol.com.br'];
         const isGeneric = genericDomains.some(d => email.endsWith(d));
 
@@ -57,6 +64,8 @@ window.handleGoogleLogin = function(response) {
             role = 'consumer'; 
         }
 
+        console.log("[LOGIN] Conta Google selecionada:", email, "| Role definida:", role);
+
         currentUser = {
             id: data.sub || data.id,
             name: data.name,
@@ -66,14 +75,24 @@ window.handleGoogleLogin = function(response) {
             reputation: role === 'admin' ? 999999 : 50 
         };
 
+        console.log("[LOGIN] Salvando/verificando usuário no Firebase...");
         if (db) {
-            db.collection("users").doc(currentUser.id).get().then((doc) => {
+            try {
+                const docRef = db.collection("users").doc(currentUser.id);
+                const doc = await docRef.get();
                 if (doc.exists) {
-                    currentUser.reputation = doc.data().reputation;
+                    const dbData = doc.data();
+                    currentUser.reputation = dbData.reputation || 50;
+                    // Se o banco tiver uma role diferente da padrão, respeitamos a do banco
+                    if (dbData.role) currentUser.role = dbData.role; 
                 } else {
-                    db.collection("users").doc(currentUser.id).set(currentUser);
+                    await docRef.set(currentUser);
                 }
-            }).catch(e => console.warn(e));
+                console.log("[LOGIN] Sessão e permissões carregadas com sucesso no banco de dados.");
+            } catch (fbError) {
+                console.warn("[LOGIN-AVISO] Erro de permissão/conexão no Firestore:", fbError);
+                // Não bloqueamos o login se o firebase falhar (ex: modo offline ou regras)
+            }
         }
 
         document.getElementById('user-avatar').src = currentUser.picture || 'https://via.placeholder.com/40';
@@ -81,28 +100,56 @@ window.handleGoogleLogin = function(response) {
         
         let roleText = 'Consumidor';
         let roleColor = 'rgba(255,255,255,0.1)';
-        if (role === 'business') {
+        if (currentUser.role === 'business') {
             roleText = 'Empresa';
             roleColor = 'var(--primary)';
-        } else if (role === 'admin') {
+        } else if (currentUser.role === 'admin') {
             roleText = 'Administrador';
             roleColor = '#e74c3c'; 
         }
         
         document.getElementById('user-role-badge').textContent = roleText;
         document.getElementById('user-role-badge').style.background = roleColor;
-        document.getElementById('user-reputation-score').textContent = role === 'admin' ? '∞' : currentUser.reputation;
+        document.getElementById('user-reputation-score').textContent = currentUser.role === 'admin' ? '∞' : currentUser.reputation;
 
+        console.log("[LOGIN] Permissões aplicadas na UI. Role final:", currentUser.role);
+        console.log("[LOGIN] Navegação liberada. Ocultando tela de login e exibindo área principal.");
+
+        loadingBox.classList.add('hidden');
         document.getElementById('login-section').style.display = 'none';
         document.getElementById('main-content-area').style.display = 'block';
+
+        // Garante que o scroll vá para o topo para mostrar a área de GPS corretamente
+        window.scrollTo(0, 0);
+
     } catch (error) {
-        console.error("Crash no login:", error);
-        alert("Erro no Login: " + error.message);
+        console.error("[LOGIN-ERRO] Crash no fluxo de login:", error);
+        loadingBox.classList.add('hidden');
+        errorMsgBox.classList.remove('hidden');
+        errorMsgBox.textContent = "Falha no Login: " + error.message;
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // BACKDOOR SECRETO PARA TESTES (Bypass de bloqueio do Google)
+    // BACKDOOR PARA TESTES LOCAIS (Bypass de bloqueio do Google)
+    const btnMockLogin = document.getElementById('btn-mock-login');
+    if (btnMockLogin) {
+        btnMockLogin.addEventListener('click', () => {
+            const fallbackEmail = prompt("🔐 MODO DE TESTE LOCAL:\nDigite um e-mail para simular o login (ex: admin@teste.com):");
+            if (fallbackEmail && fallbackEmail.trim() !== "") {
+                window.handleGoogleLogin({
+                    credential: btoa(JSON.stringify({
+                        email: fallbackEmail,
+                        name: fallbackEmail.split('@')[0],
+                        sub: "dev_" + Date.now(),
+                        picture: "https://via.placeholder.com/40"
+                    }))
+                });
+            }
+        });
+    }
+
+    // BACKDOOR SECRETO (Duplo clique na logo)
     const logoEl = document.querySelector('.logo');
     if (logoEl) {
         logoEl.addEventListener('dblclick', () => {
@@ -117,21 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }))
                 });
             }
-    // Auto-Login DEV (Bypass para testar o App sem o Google no Netlify Drop ou Localhost)
-    if (window.location.hostname.includes('netlify.app') || window.location.hostname === 'localhost' || window.location.hostname === '') {
-        console.log("Ambiente de teste detectado. Fazendo Auto-Login DEV.");
-        setTimeout(() => {
-            window.handleGoogleLogin({
-                credential: btoa(JSON.stringify({
-                    email: "dev_vitor@teste.com",
-                    name: "Admin (Teste)",
-                    sub: "dev_" + Date.now(),
-                    picture: "https://via.placeholder.com/40"
-                }))
-            });
-        }, 500);
+        });
     }
-    
     const btnGps = document.getElementById('btn-gps');
     const locationStatus = document.getElementById('location-status');
     const locationSection = document.getElementById('location-section');
@@ -965,4 +999,133 @@ document.addEventListener('DOMContentLoaded', () => {
         window.pendingMarket = null;
         alert("Cadastro de mercado cancelado.");
     });
-});
+
+    // --- LÓGICA DO PAINEL ADMINISTRATIVO ---
+    const userProfileHeader = document.getElementById('user-profile-header');
+    const adminModal = document.getElementById('admin-modal');
+    const btnCloseAdmin = document.getElementById('btn-close-admin');
+    const btnAdminSearch = document.getElementById('btn-admin-search');
+    const adminSearchUser = document.getElementById('admin-search-user');
+    const adminUsersList = document.getElementById('admin-users-list');
+
+    userProfileHeader.addEventListener('click', () => {
+        if (currentUser && currentUser.role === 'admin') {
+            console.log("[ADMIN] Abrindo painel administrativo...");
+            adminModal.classList.remove('hidden');
+        } else {
+            console.log("[PERFIL] Clique no perfil (não é admin). Role:", currentUser ? currentUser.role : "Deslogado");
+        }
+    });
+
+    btnCloseAdmin.addEventListener('click', () => {
+        adminModal.classList.add('hidden');
+        adminUsersList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: 20px;">Digite um nome ou e-mail para pesquisar.</div>';
+        adminSearchUser.value = '';
+    });
+
+    function renderAdminUsers(users) {
+        if (users.length === 0) {
+            adminUsersList.innerHTML = '<p style="text-align:center; color: #e74c3c;">Nenhum usuário encontrado.</p>';
+            return;
+        }
+
+        adminUsersList.innerHTML = users.map(u => `
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 15px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="${u.picture || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%;">
+                    <div style="flex: 1;">
+                        <strong style="display: block;">${u.name}</strong>
+                        <small style="color: var(--text-muted);">${u.email}</small>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; justify-content: space-between;">
+                    <select class="search-input admin-role-select" data-uid="${u.id}" style="width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;">
+                        <option value="consumer" ${u.role === 'consumer' ? 'selected' : ''}>Consumidor</option>
+                        <option value="business" ${u.role === 'business' ? 'selected' : ''}>Empresa</option>
+                        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrador</option>
+                    </select>
+                    <button class="btn-primary btn-save-role" data-uid="${u.id}" style="padding: 5px 15px; font-size: 0.8rem; margin: 0; border-radius: 5px;">Salvar</button>
+                </div>
+            </div>
+        `).join('');
+
+        // Adicionar eventos aos botões de salvar do modal admin
+        document.querySelectorAll('.btn-save-role').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const uid = e.target.getAttribute('data-uid');
+                const selectEl = document.querySelector(`.admin-role-select[data-uid="${uid}"]`);
+                const newRole = selectEl.value;
+                
+                if (confirm("Tem certeza que deseja alterar a permissão deste usuário?")) {
+                    btn.textContent = "...";
+                    if (db) {
+                        db.collection("users").doc(uid).update({ role: newRole }).then(() => {
+                            btn.textContent = "Salvo!";
+                            btn.style.background = "#4cd137";
+                            setTimeout(() => { btn.textContent = "Salvar"; btn.style.background = ""; }, 2000);
+                        }).catch(err => {
+                            console.error("[ADMIN] Erro ao salvar permissão", err);
+                            alert("Erro ao alterar permissão.");
+                            btn.textContent = "Salvar";
+                        });
+                    }
+                }
+            });
+        });
+    }
+
+    btnAdminSearch.addEventListener('click', () => {
+        const query = adminSearchUser.value.trim().toLowerCase();
+        if (!query) return;
+
+        const results = window.usersDB.filter(u => 
+            (u.email && u.email.toLowerCase().includes(query)) || 
+            (u.name && u.name.toLowerCase().includes(query))
+        );
+        
+        renderAdminUsers(results);
+    });
+
+    // --- LÓGICA DO SISTEMA DE CRÍTICAS E SUGESTÕES ---
+    const btnOpenFeedback = document.getElementById('btn-open-feedback');
+    const feedbackModal = document.getElementById('feedback-modal');
+    const btnCancelFeedback = document.getElementById('btn-cancel-feedback');
+    const feedbackForm = document.getElementById('feedback-form');
+
+    btnOpenFeedback.addEventListener('click', () => {
+        if (!currentUser) {
+            alert("Você precisa fazer login para enviar uma crítica.");
+            return;
+        }
+        
+        // Preenche os campos ocultos do formsubmit
+        document.getElementById('feedback-user-name').value = currentUser.name;
+        document.getElementById('feedback-user-email').value = currentUser.email;
+        
+        const now = new Date();
+        const formattedDate = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
+        document.getElementById('feedback-date').value = formattedDate;
+
+        feedbackModal.classList.remove('hidden');
+    });
+
+    btnCancelFeedback.addEventListener('click', () => {
+        feedbackModal.classList.add('hidden');
+    });
+
+    // Ocultar formulário após submit (O FormSubmit fará o redirecionamento ou mostrará captcha)
+    feedbackForm.addEventListener('submit', (e) => {
+        // Opcional: Salvar no Firebase como backup
+        if (db && currentUser) {
+            const message = document.getElementById('feedback-message').value;
+            db.collection("feedbacks").add({
+                userId: currentUser.id,
+                name: currentUser.name,
+                email: currentUser.email,
+                message: message,
+                date: new Date().toISOString()
+            }).catch(err => console.warn("Erro ao salvar feedback localmente", err));
+        }
+        
+        // Deixar o navegador seguir com o envio do form para o FormSubmit.co
+    });
