@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
     <!-- Local CSS -->
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=26">
     
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -123,12 +123,6 @@
                         </div>
                     </div>
 
-                    <div id="admin-panel-btn-container" class="hidden" style="position: relative;">
-                        <span id="admin-notification-badge" class="hidden" style="position: absolute; top: 10px; right: -5px; background: red; color: white; width: 20px; height: 20px; border-radius: 50%; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: bold; z-index: 2;">!</span>
-                        <button id="btn-open-admin" class="btn-danger" style="width: 100%; margin-top: 20px;">🛡️ Acessar Painel Admin</button>
-                    </div>
-
-                    <button id="btn-open-feedback" class="btn-secondary" style="width: 100%; margin-top: 15px;">💬 Nos fale sua crítica</button>
                     <button id="btn-logout" class="btn-danger" style="width: 100%; margin-top: 15px;">Sair</button>
 
                     <div style="margin-top: 40px; font-size: 0.75rem; color: var(--text-muted);">
@@ -156,39 +150,15 @@
         </nav>
     </div>
 
-    <!-- MODAL DE CRÍTICAS E SUGESTÕES -->
-    <div id="feedback-modal" class="modal-overlay hidden">
-        <div class="glass-card modal-content" style="padding: 20px; border-radius: 20px; background: var(--bg-card); max-width: 90%; width: 400px;">
-            <h2 style="margin-bottom: 20px; text-align: center;">Críticas e Sugestões</h2>
-            <p style="text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Sua opinião será enviada diretamente para o administrador ler no app.</p>
-            
-            <div id="feedback-form">
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Sua Mensagem *</label>
-                    <textarea id="feedback-message" class="input-text" rows="5" placeholder="Escreva sua crítica, sugestão ou comentário..." style="width: 100%; resize: vertical;" required></textarea>
-                </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button type="button" id="btn-cancel-feedback" class="btn-secondary">Cancelar</button>
-                    <button type="button" id="btn-submit-feedback" class="btn-action" style="flex: 1;">Enviar Mensagem</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL CADASTRO DE MERCADO -->
     <div id="market-modal" class="modal-overlay hidden">
         <div class="glass-card modal-content" style="padding: 20px; border-radius: 20px; background: var(--bg-card); max-width: 90%; width: 400px; max-height: 90vh; overflow-y: auto;">
             <h2 style="margin-bottom: 15px; text-align: center; color: var(--primary);">Cadastrar Mercado</h2>
             <p style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Digite o CEP para buscar o endereço automaticamente.</p>
 
-            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
-                <div style="flex: 2;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">CEP *</label>
-                    <input type="text" id="new-market-cep" class="input-text" style="width: 100%;" placeholder="00000-000">
-                </div>
-                <div style="flex: 1; display: flex; align-items: flex-end;">
-                    <button id="btn-search-cep" class="btn-action" style="padding: 12px; border-radius: 10px;">Buscar</button>
-                </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">CEP *</label>
+                <input type="text" id="new-market-cep" class="input-text" style="width: 100%;" placeholder="00000-000" maxlength="9">
             </div>
 
             <div style="margin-bottom: 15px;">
@@ -225,43 +195,12 @@
         </div>
     </div>
 
-    <!-- MODAL PAINEL ADMIN -->
-    <div id="admin-modal" class="modal-overlay hidden">
-        <div class="glass-card modal-content" style="padding: 20px; border-radius: 20px; background: var(--bg-card); max-width: 90%; width: 500px; max-height: 90vh; display: flex; flex-direction: column;">
-            <h2 style="margin-bottom: 15px; text-align: center; color: var(--danger);">🛡️ Painel Admin</h2>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button id="admin-tab-feedbacks" class="btn-action" style="flex: 1; padding: 10px;">📩 Mensagens</button>
-                <button id="admin-tab-users" class="btn-secondary" style="flex: 1; padding: 10px;">👥 Usuários</button>
-            </div>
-
-            <!-- TAB MENSAGENS -->
-            <div id="admin-content-feedbacks" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: 400px;">
-                <!-- Feedbacks injetados via JS -->
-            </div>
-
-            <!-- TAB USUÁRIOS -->
-            <div id="admin-content-users" class="hidden" style="flex: 1; display: flex; flex-direction: column; max-height: 400px;">
-                <div style="margin-bottom: 15px;">
-                    <input type="text" id="admin-search-users" class="input-text" style="width: 100%;" placeholder="Pesquisar por nome ou e-mail...">
-                </div>
-                <div id="admin-users-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto;">
-                    <!-- Lista injetada via JS -->
-                </div>
-            </div>
-            
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-                <button id="btn-close-admin" class="btn-secondary" style="width: 100%;">Fechar Painel</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Scripts Externos -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     
     <!-- App Logic -->
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=26"></script>
 </body>
 </html>
