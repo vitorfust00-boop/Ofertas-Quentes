@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ofertas Quente 2.0</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Local CSS -->
+    <link rel="stylesheet" href="style.css?v=25">
+    
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+    <!-- OVERLAY DE LOGIN GLOBAL (1º PASSO: E-MAIL) -->
+    <div id="login-overlay" class="login-overlay" style="z-index: 9999;">
+        <div class="login-card">
+            <h1 class="logo">🔥 Ofertas <span class="highlight">Quente</span></h1>
+            <p class="subtitle">Faça login para acessar o aplicativo</p>
+            
+            <div id="login-warning" class="hidden error-box">
+                O Google não permite login em arquivos locais. Se testando no PC, suba para um servidor.
+            </div>
+
+            <div id="g_id_onload"
+                 data-client_id="80926685032-jke4jqu7ffe6b2lf6oflar1bdtfeagmd.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLogin"
+                 data-auto_prompt="false">
+            </div>
+            
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" style="display: flex; justify-content: center; margin-top: 20px;"></div>
+            
+            <div id="login-loading" class="hidden" style="margin-top: 20px; text-align: center;">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px; color: var(--primary);">Autenticando...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY DE GPS (2º PASSO: LOCALIZAÇÃO OBRIGATÓRIA) -->
+    <div id="gps-overlay" class="login-overlay hidden" style="z-index: 9998; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;">
+        <span style="font-size: 4rem; margin-bottom: 20px;">📍</span>
+        <h2 style="margin-bottom: 15px;">Onde você está?</h2>
+        <p style="color: var(--text-muted); margin-bottom: 30px; font-size: 0.95rem;">Precisamos acessar o seu GPS para encontrar os mercados na sua região.</p>
+        <button id="btn-request-gps" class="btn-action" style="max-width: 300px;">Permitir GPS e Entrar</button>
+        <p id="gps-error-msg" class="hidden" style="color: #e74c3c; margin-top: 15px; font-size: 0.85rem;"></p>
+    </div>
+
+    <!-- MAIN APP CONTAINER (Oculto até liberar GPS) -->
+    <div id="app-container" class="app-container hidden">
+        
+        <!-- HEADER GLOBAL -->
+        <header class="app-header">
+            <h2>🔥 Ofertas <span class="highlight">Quente</span></h2>
+            <div class="header-profile" id="header-profile-btn" style="cursor: pointer;">
+                <img id="header-avatar" src="https://via.placeholder.com/40" alt="Perfil" class="avatar-sm">
+            </div>
+        </header>
+
+        <!-- ÁREA DE CONTEÚDO (ABAS) -->
+        <main class="tab-content-area">
+            
+            <!-- ABA 1: MAPA / INÍCIO -->
+            <section id="tab-map" class="tab-pane active">
+                
+                <!-- MAPA -->
+                <div id="map-wrapper" class="map-wrapper">
+                    <div id="map"></div>
+                    <!-- Crosshair para escolher local do mercado -->
+                    <div id="map-crosshair" class="hidden" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; text-align: center;">
+                        <span style="font-size: 30px; line-height: 1; text-shadow: 0 0 5px #000;">🎯</span>
+                        <div style="background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; margin-top: 5px; white-space: nowrap;">Arraste o mapa para o local do mercado</div>
+                    </div>
+                    <div class="map-overlay-controls" style="display: flex; flex-direction: column; gap: 10px;">
+                        <button id="btn-add-market" class="btn-secondary hidden" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);">🏪 Cadastrar Mercado</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 2: OFERTAS (#marketprice) -->
+            <section id="tab-offers" class="tab-pane">
+                <div class="container-padding">
+                    <h2 class="section-title">🏷️ Mural de Ofertas</h2>
+                    <div class="search-bar-wrapper">
+                        <input type="text" id="search-offers" class="input-text" placeholder="Buscar por leite, arroz...">
+                        <button class="btn-action-small">🔍</button>
+                    </div>
+                    
+                    <div id="offers-feed" class="feed-grid">
+                        <div class="empty-state">
+                            <p>Nenhuma oferta encontrada na região ainda.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: PERFIL -->
+            <section id="tab-profile" class="tab-pane">
+                
+                <!-- ESTADO LOGADO (PERFIL DO USUÁRIO) -->
+                <div id="profile-logged-state" class="container-padding profile-section">
+                    <img id="profile-avatar-large" src="https://via.placeholder.com/100" class="avatar-lg">
+                    <h2 id="profile-name">Nome do Usuário</h2>
+                    <p id="profile-email" class="text-muted">email@exemplo.com</p>
+                    
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <span class="stat-value" id="profile-reputation">50</span>
+                            <span class="stat-label">Reputação</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value" id="profile-role">Consumidor</span>
+                            <span class="stat-label">Permissão</span>
+                        </div>
+                    </div>
+
+                    <button id="btn-logout" class="btn-danger" style="width: 100%; margin-top: 15px;">Sair</button>
+
+                    <div style="margin-top: 40px; font-size: 0.75rem; color: var(--text-muted);">
+                        Créditos de ajuda: Rafael Garcia Toledo e Sophia Chalegre Calegari
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="tab-map">
+                <span class="icon">🗺️</span>
+                <span class="label">Início</span>
+            </button>
+            <button class="nav-item" data-target="tab-offers">
+                <span class="icon">🏷️</span>
+                <span class="label">Ofertas</span>
+            </button>
+            <button class="nav-item" data-target="tab-profile">
+                <span class="icon">👤</span>
+                <span class="label">Perfil</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- MODAL CADASTRO DE MERCADO -->
+    <div id="market-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-content" style="padding: 20px; border-radius: 20px; background: var(--bg-card); max-width: 90%; width: 400px; max-height: 90vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 15px; text-align: center; color: var(--primary);">Cadastrar Mercado</h2>
+            <p style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Digite o CEP para buscar o endereço automaticamente.</p>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">CEP *</label>
+                <input type="text" id="new-market-cep" class="input-text" style="width: 100%;" placeholder="00000-000" maxlength="9">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Nome do Estabelecimento *</label>
+                <input type="text" id="new-market-name" class="input-text" style="width: 100%;" placeholder="Ex: Supermercado Preço Bom">
+            </div>
+            
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <div style="flex: 2;">
+                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Rua / Logradouro</label>
+                    <input type="text" id="new-market-street" class="input-text" style="width: 100%;" placeholder="Rua..." disabled>
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Número *</label>
+                    <input type="text" id="new-market-number" class="input-text" style="width: 100%;" placeholder="Ex: 123">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 25px; display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Bairro</label>
+                    <input type="text" id="new-market-neighborhood" class="input-text" style="width: 100%;" placeholder="Bairro" disabled>
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; color: var(--text-muted);">Cidade / UF</label>
+                    <input type="text" id="new-market-city" class="input-text" style="width: 100%;" placeholder="Cidade" disabled>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="btn-cancel-market" class="btn-secondary">Cancelar</button>
+                <button id="btn-submit-market" class="btn-action" style="flex: 1; background: #2ecc71;">Salvar Mercado</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts Externos -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    
+    <!-- App Logic -->
+    <script src="app.js?v=25"></script>
+</body>
+</html>
