@@ -1,12 +1,12 @@
 // Configuração Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyC-pAVKhvkHAc2NthHBjVqoFbM6xXo9gE8",
-    authDomain: "ofertas-quente.firebaseapp.com",
-    projectId: "ofertas-quente",
-    storageBucket: "ofertas-quente.firebasestorage.app",
-    messagingSenderId: "1029283679781",
-    appId: "1:1029283679781:web:e521b1a9822205770a79cc",
-    measurementId: "G-FHGJG2HFJV"
+    apiKey: "AIzaSyAhju2etYQSDxXtjTeL3B1FjX44Xj866FM",
+    authDomain: "ofertas-quentes-2.firebaseapp.com",
+    projectId: "ofertas-quentes-2",
+    storageBucket: "ofertas-quentes-2.firebasestorage.app",
+    messagingSenderId: "1097214270261",
+    appId: "1:1097214270261:web:66e270bff5a6e5ed3cca7c",
+    measurementId: "G-JPTHLKQ45L"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -92,33 +92,15 @@ window.handleGoogleLogin = async function(response) {
             if (user.role === 'business') {
                 roleText = 'Empresa';
                 document.getElementById('btn-add-market').classList.remove('hidden');
-                document.getElementById('admin-panel-btn-container').classList.add('hidden');
             }
             if (user.role === 'admin') {
                 roleText = 'Administrador';
-                document.getElementById('admin-panel-btn-container').classList.remove('hidden');
                 document.getElementById('btn-add-market').classList.remove('hidden');
-                checkUnreadFeedbacks(); // Verifica se há mensagens novas
             }
             if (user.role === 'consumer' || !user.role) {
                 document.getElementById('btn-add-market').classList.add('hidden');
-                document.getElementById('admin-panel-btn-container').classList.add('hidden');
             }
             document.getElementById('profile-role').textContent = roleText;
-        }
-
-        // Função para checar msgs não lidas
-        function checkUnreadFeedbacks() {
-            if (!db) return;
-            db.collection("feedbacks").where("read", "==", false).get().then(snap => {
-                const badge = document.getElementById('admin-notification-badge');
-                if (!snap.empty) {
-                    badge.textContent = snap.size;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }).catch(() => {});
         }
 
         // Esconder a tela de login global e mostrar a tela de GPS
@@ -274,6 +256,46 @@ function initializeLeafletMap(lat, lon) {
 }
 
 // ============================================
+// LÓGICA DO MAPA E MARCADORES
+// ============================================
+// Dicionário para não duplicar marcadores
+const marketMarkers = {};
+
+function loadMarkets() {
+    if (!db) return;
+    
+    // Agora em Tempo Real (Real-time)!
+    db.collection("markets").onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach(change => {
+            const data = change.doc.data();
+            const id = change.doc.id;
+            
+            if (change.type === "added" || change.type === "modified") {
+                if (data.lat && data.lon) {
+                    // Remover o pino antigo se estiver sendo modificado
+                    if (marketMarkers[id]) {
+                        map.removeLayer(marketMarkers[id]);
+                    }
+                    // Criar o pino novo
+                    const marker = L.marker([data.lat, data.lon]).addTo(map)
+                        .bindPopup(`<b>${data.nome}</b><br>${data.bairro || data.rua || ''} nº ${data.numero}`);
+                    
+                    marketMarkers[id] = marker;
+                }
+            }
+            if (change.type === "removed") {
+                if (marketMarkers[id]) {
+                    map.removeLayer(marketMarkers[id]);
+                    delete marketMarkers[id];
+                }
+            }
+        });
+    }, e => {
+        alert("Erro GRAVE no mapa: " + e.message);
+    });
+}
+
+// ============================================
 // LÓGICA DE CADASTRO DE MERCADO
 // ============================================
 let pendingMarketLocation = null;
@@ -292,54 +314,64 @@ document.getElementById('btn-add-market').addEventListener('click', () => {
     pendingMarketLocation = { lat: center.lat, lng: center.lng };
 });
 
-document.getElementById('btn-search-cep').addEventListener('click', async () => {
-    let cep = document.getElementById('new-market-cep').value.replace(/\D/g, '');
-    if (cep.length !== 8) {
-        alert("CEP inválido. Digite 8 números.");
-        return;
+document.getElementById('new-market-cep').addEventListener('input', async (e) => {
+    let cep = e.target.value.replace(/\D/g, '');
+    
+    // Formatação visual automática
+    if (cep.length > 5) {
+        e.target.value = cep.substring(0, 5) + '-' + cep.substring(5, 8);
+    } else {
+        e.target.value = cep;
     }
-    
-    const btn = document.getElementById('btn-search-cep');
-    btn.textContent = "...";
-    
-    try {
-        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-        const data = await res.json();
+
+    if (cep.length === 8) {
+        document.getElementById('new-market-street').value = 'Buscando...';
+        document.getElementById('new-market-neighborhood').value = 'Buscando...';
+        document.getElementById('new-market-city').value = 'Buscando...';
         
-        if (data.erro) {
-            alert("CEP não encontrado.");
-            return;
-        }
-        
-        document.getElementById('new-market-street').value = data.logradouro || '';
-        document.getElementById('new-market-neighborhood').value = data.bairro || '';
-        document.getElementById('new-market-city').value = `${data.localidade} / ${data.uf}`;
-        
-        // Tentar achar a latitude/longitude via OpenStreetMap (Nominatim)
-        const street = data.logradouro;
-        const city = data.localidade;
-        
-        if (street && city) {
-            const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(street)}&city=${encodeURIComponent(city)}&country=Brazil&format=json`);
-            const nomData = await nomRes.json();
+        try {
+            const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            const data = await res.json();
             
-            if (nomData && nomData.length > 0) {
-                pendingMarketLocation = {
-                    lat: parseFloat(nomData[0].lat),
-                    lng: parseFloat(nomData[0].lon)
-                };
-                
-                // Mover o mapa no fundo para mostrar que achou
-                if (map) {
-                    map.setView([pendingMarketLocation.lat, pendingMarketLocation.lng], 16);
-                }
+            if (data.erro) {
+                alert("CEP não encontrado.");
+                document.getElementById('new-market-street').value = '';
+                document.getElementById('new-market-neighborhood').value = '';
+                document.getElementById('new-market-city').value = '';
+                return;
             }
+            
+            document.getElementById('new-market-street').value = data.logradouro || '';
+            document.getElementById('new-market-neighborhood').value = data.bairro || '';
+            document.getElementById('new-market-city').value = `${data.localidade} / ${data.uf}`;
+            
+            // Foca no número para facilitar a vida do usuário
+            document.getElementById('new-market-number').focus();
+            
+            // Tentar achar a latitude/longitude via OpenStreetMap em segundo plano sem travar (sem await!)
+            const street = data.logradouro;
+            const city = data.localidade;
+            
+            if (street && city) {
+                fetch(`https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(street)}&city=${encodeURIComponent(city)}&country=Brazil&format=json`)
+                .then(r => r.json())
+                .then(nomData => {
+                    if (nomData && nomData.length > 0) {
+                        pendingMarketLocation = {
+                            lat: parseFloat(nomData[0].lat),
+                            lng: parseFloat(nomData[0].lon)
+                        };
+                        
+                        if (map) {
+                            map.setView([pendingMarketLocation.lat, pendingMarketLocation.lng], 16);
+                        }
+                    }
+                }).catch(e => console.log("Erro silencioso Nominatim:", e));
+            }
+            
+        } catch (e) {
+            alert("Erro ao buscar CEP: " + e.message);
         }
-        
-    } catch (e) {
-        alert("Erro ao buscar CEP: " + e.message);
-    } finally {
-        btn.textContent = "Buscar";
     }
 });
 
@@ -369,17 +401,22 @@ document.getElementById('btn-submit-market').addEventListener('click', async () 
             bairro: bairro,
             numero: numero,
             cidade: cidade,
+            rua: rua,
             lat: pendingMarketLocation.lat,
             lon: pendingMarketLocation.lng,
             createdBy: currentUser.id,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: new Date()
         };
 
         if (db) {
-            await db.collection("markets").add(marketData);
+            // Dispara e avisa o erro na tela se falhar!
+            db.collection("markets").add(marketData).catch(err => {
+                alert("ERRO DE BANCO DE DADOS: Não foi possível salvar o mercado. " + err.message);
+                console.error("Erro background market:", err);
+            });
         }
 
-        // Criar o pino visualmente no mapa
+        // Criar o pino visualmente no mapa imediatamente (Ilusão de velocidade)
         L.marker([pendingMarketLocation.lat, pendingMarketLocation.lng]).addTo(map)
             .bindPopup(`<b>${nome}</b><br>${rua || ''} nº ${numero}`).openPopup();
 
@@ -402,209 +439,4 @@ document.getElementById('btn-submit-market').addEventListener('click', async () 
     }
 });
 
-// ============================================
-// LÓGICA DO PAINEL ADMIN
-// ============================================
-
-document.getElementById('btn-open-admin').addEventListener('click', () => {
-    try {
-        const modal = document.getElementById('admin-modal');
-        if (!modal) {
-            alert("Erro: O HTML do admin-modal não foi encontrado na página! Verifique o cache.");
-            return;
-        }
-        modal.classList.remove('hidden');
-        
-        // Sempre abre na aba de mensagens primeiro
-        document.getElementById('admin-tab-feedbacks').click();
-    } catch (e) {
-        alert("Erro ao abrir painel admin: " + e.message);
-    }
-});
-
-document.getElementById('btn-close-admin').addEventListener('click', () => {
-    document.getElementById('admin-modal').classList.add('hidden');
-    // Re-checar as notificações ao fechar (caso tenha lido algo)
-    if (currentUser && currentUser.role === 'admin') {
-        db.collection("feedbacks").where("read", "==", false).get().then(snap => {
-            const badge = document.getElementById('admin-notification-badge');
-            if (!snap.empty) {
-                badge.textContent = snap.size;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }).catch(() => {});
-    }
-});
-
-// Navegação interna do Admin
-document.getElementById('admin-tab-feedbacks').addEventListener('click', () => {
-    document.getElementById('admin-tab-feedbacks').classList.replace('btn-secondary', 'btn-action');
-    document.getElementById('admin-tab-users').classList.replace('btn-action', 'btn-secondary');
-    
-    document.getElementById('admin-content-feedbacks').classList.remove('hidden');
-    document.getElementById('admin-content-users').classList.add('hidden');
-    loadAdminFeedbacks();
-});
-
-document.getElementById('admin-tab-users').addEventListener('click', () => {
-    document.getElementById('admin-tab-users').classList.replace('btn-secondary', 'btn-action');
-    document.getElementById('admin-tab-feedbacks').classList.replace('btn-action', 'btn-secondary');
-    
-    document.getElementById('admin-content-users').classList.remove('hidden');
-    document.getElementById('admin-content-feedbacks').classList.add('hidden');
-    loadAdminUsers();
-});
-
-// Carregar Feedbacks
-function loadAdminFeedbacks() {
-    const list = document.getElementById('admin-content-feedbacks');
-    list.innerHTML = '<div style="text-align: center; padding: 20px;">Carregando mensagens...</div>';
-    
-    db.collection("feedbacks").orderBy("timestamp", "desc").limit(50).get().then((snapshot) => {
-        list.innerHTML = '';
-        if (snapshot.empty) {
-            list.innerHTML = '<div class="empty-state">Nenhuma mensagem recebida.</div>';
-            return;
-        }
-
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const card = document.createElement('div');
-            
-            // Estilo diferente se não foi lido
-            const bgClass = data.read ? 'rgba(255,255,255,0.05)' : 'rgba(243, 156, 18, 0.2)';
-            const borderClass = data.read ? 'none' : '1px solid var(--primary)';
-            
-            card.style.cssText = `background: ${bgClass}; border: ${borderClass}; padding: 15px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px;`;
-            
-            const dateStr = data.timestamp ? data.timestamp.toDate().toLocaleString() : 'Recente';
-            
-            card.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: var(--primary);">${data.name || 'Anônimo'}</strong>
-                    <span style="font-size: 0.7rem; color: var(--text-muted);">${dateStr}</span>
-                </div>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">${data.email || ''}</div>
-                <div style="font-size: 0.95rem; margin-top: 5px; white-space: pre-wrap; line-height: 1.4;">${data.message || ''}</div>
-                ${!data.read ? `<button class="btn-secondary" style="margin-top: 10px; padding: 5px; font-size: 0.8rem;" onclick="markFeedbackRead('${doc.id}', this)">Marcar como lido</button>` : ''}
-            `;
-            list.appendChild(card);
-        });
-    }).catch(err => {
-        list.innerHTML = '<div style="color: red; text-align: center;">Erro ao carregar mensagens.</div>';
-        console.error("Erro Feedbacks:", err);
-    });
-}
-
-// Tornar global para o onclick
-window.markFeedbackRead = function(docId, btnElement) {
-    btnElement.textContent = "Marcando...";
-    btnElement.disabled = true;
-    db.collection("feedbacks").doc(docId).update({ read: true }).then(() => {
-        btnElement.parentElement.style.background = 'rgba(255,255,255,0.05)';
-        btnElement.parentElement.style.border = 'none';
-        btnElement.remove();
-    }).catch(err => {
-        btnElement.textContent = "Erro!";
-    });
-};
-
-function loadAdminUsers(searchQuery = '') {
-    const list = document.getElementById('admin-users-list');
-    list.innerHTML = '<div style="text-align: center; padding: 20px;">Carregando usuários...</div>';
-    
-    db.collection("users").limit(50).get().then((snapshot) => {
-        list.innerHTML = '';
-        if (snapshot.empty) {
-            list.innerHTML = '<div class="empty-state">Nenhum usuário encontrado no banco.</div>';
-            return;
-        }
-
-        const queryLower = searchQuery.toLowerCase();
-
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const name = data.name || 'Sem nome';
-            const email = data.email || 'Sem e-mail';
-            
-            if (searchQuery && !name.toLowerCase().includes(queryLower) && !email.toLowerCase().includes(queryLower)) {
-                return;
-            }
-
-            const card = document.createElement('div');
-            card.style.cssText = "background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;";
-            
-            card.innerHTML = `
-                <div>
-                    <strong style="color: var(--primary);">${name}</strong><br>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">${email}</span>
-                </div>
-                <div style="font-size: 0.8rem; background: var(--bg-dark); padding: 4px 8px; border-radius: 10px; text-transform: uppercase;">
-                    ${data.role || 'consumer'}
-                </div>
-            `;
-            list.appendChild(card);
-        });
-
-        if (list.innerHTML === '') {
-            list.innerHTML = '<div class="empty-state" style="padding: 10px;">Nenhum usuário corresponde à pesquisa.</div>';
-        }
-    }).catch(err => {
-        list.innerHTML = '<div style="color: red; text-align: center;">Erro ao carregar usuários.</div>';
-        console.error("Erro Admin:", err);
-    });
-}
-
-document.getElementById('admin-search-users').addEventListener('input', (e) => {
-    loadAdminUsers(e.target.value);
-});
-
-// ============================================
-// LÓGICA DE CRÍTICAS E SUGESTÕES
-// ============================================
-document.getElementById('btn-open-feedback').addEventListener('click', () => {
-    document.getElementById('feedback-modal').classList.remove('hidden');
-});
-
-document.getElementById('btn-cancel-feedback').addEventListener('click', () => {
-    document.getElementById('feedback-modal').classList.add('hidden');
-});
-
-document.getElementById('btn-submit-feedback').addEventListener('click', async () => {
-    const msgInput = document.getElementById('feedback-message');
-    const message = msgInput.value.trim();
-    
-    if (!message) {
-        alert("Por favor, digite uma mensagem.");
-        return;
-    }
-
-    const btn = document.getElementById('btn-submit-feedback');
-    btn.textContent = "Enviando...";
-    btn.disabled = true;
-
-    try {
-        // Dispara e esquece! Não usamos await para não travar a UI (evita demorar "1000 anos")
-        db.collection("feedbacks").add({
-            userId: currentUser ? currentUser.id : 'anon',
-            name: currentUser ? currentUser.name : 'Visitante',
-            email: currentUser ? currentUser.email : '',
-            message: message,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            read: false
-        }).catch(err => {
-            console.error("Erro background feedback:", err);
-        });
-
-        alert("Sua crítica foi enviada ao administrador!");
-        document.getElementById('feedback-modal').classList.add('hidden');
-        msgInput.value = '';
-    } catch (e) {
-        console.error(e);
-    } finally {
-        btn.textContent = "Enviar Mensagem";
-        btn.disabled = false;
-    }
-});
+// FIM DO SCRIPT
